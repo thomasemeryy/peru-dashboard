@@ -5,7 +5,7 @@ import {
   Map as MapIcon, Wallet, Notebook, CheckSquare, AlertCircle,
   ExternalLink, Navigation, Calculator as CalcIcon, Grid, List, 
   Upload, Share2, Tent, Landmark, Palmtree, ArrowRight, ArrowDown, ArrowLeft,
-  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen, MessageSquare, ThumbsUp
+  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen
 } from 'lucide-react';
 
 // --- INITIAL DATA ---
@@ -584,115 +584,6 @@ const BudgetPlanner = () => {
   );
 };
 
-// Notes Component
-const NotesBoard = () => {
-  const [activeTab, setActiveTab] = useState('packing');
-  const [notes, setNotes] = useState(() => {
-    const saved = localStorage.getItem('peru-notes');
-    return saved ? JSON.parse(saved) : { packing: ["Hiking boots", "Water purification tablets"], medical: ["Yellow Fever cert", "Altitude meds"], general: ["Check passport expiry"] };
-  });
-  
-  useEffect(() => {
-    localStorage.setItem('peru-notes', JSON.stringify(notes));
-  }, [notes]);
-
-  const [newNote, setNewNote] = useState("");
-  const addNote = () => { if (!newNote) return; setNotes({ ...notes, [activeTab]: [...notes[activeTab], newNote] }); setNewNote(""); };
-  const removeNote = (category, index) => { const newCatNotes = [...notes[category]]; newCatNotes.splice(index, 1); setNotes({ ...notes, [category]: newCatNotes }); };
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 min-h-[600px]">
-      <h2 className="text-xl font-bold text-stone-800 mb-6 flex items-center gap-2"><Notebook className="text-emerald-600" /> Notebook</h2>
-      <div className="flex gap-2 mb-6 border-b border-stone-100 pb-1">{['packing', 'medical', 'general'].map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-t-lg font-medium text-sm capitalize transition-colors ${activeTab === tab ? "bg-stone-100 text-stone-800 border-b-2 border-emerald-500" : "text-stone-400 hover:text-stone-600"}`}>{tab}</button>))}</div>
-      <div className="mb-4 flex gap-2"><input type="text" value={newNote} onChange={(e) => setNewNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addNote()} placeholder={`Add item...`} className="flex-grow p-3 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-100" /><button onClick={addNote} className="bg-emerald-600 text-white px-4 rounded-lg hover:bg-emerald-700"><Plus size={20} /></button></div>
-      <div className="space-y-2">{notes[activeTab].map((note, idx) => (<div key={idx} className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg border border-stone-100 group"><button onClick={() => removeNote(activeTab, idx)} className="text-stone-300 hover:text-emerald-500"><CheckSquare size={18} /></button><span className="text-stone-700">{note}</span><button onClick={() => removeNote(activeTab, idx)} className="ml-auto text-stone-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button></div>))}</div>
-    </div>
-  );
-};
-
-// --- NEW SUGGESTION BOX COMPONENT ---
-const SuggestionBox = () => {
-  const [suggestions, setSuggestions] = useState(() => {
-    const saved = localStorage.getItem('peru-suggestions');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [newSuggestion, setNewSuggestion] = useState("");
-
-  useEffect(() => {
-    localStorage.setItem('peru-suggestions', JSON.stringify(suggestions));
-  }, [suggestions]);
-
-  const addSuggestion = () => {
-    if (!newSuggestion.trim()) return;
-    setSuggestions([{ id: Date.now(), text: newSuggestion, votes: 0 }, ...suggestions]);
-    setNewSuggestion("");
-  };
-
-  const voteSuggestion = (id) => {
-    setSuggestions(suggestions.map(s => s.id === id ? { ...s, votes: s.votes + 1 } : s));
-  };
-
-  const deleteSuggestion = (id) => {
-    setSuggestions(suggestions.filter(s => s.id !== id));
-  };
-
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 min-h-[600px]">
-      <h2 className="text-xl font-bold text-stone-800 mb-6 flex items-center gap-2">
-        <MessageSquare className="text-emerald-600" /> Group Suggestions
-      </h2>
-      
-      <div className="mb-8">
-        <textarea 
-          value={newSuggestion}
-          onChange={(e) => setNewSuggestion(e.target.value)}
-          placeholder="Paste ideas from group chat or type a suggestion..."
-          className="w-full p-4 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-100 min-h-[100px] text-sm"
-        />
-        <button 
-          onClick={addSuggestion}
-          className="mt-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center gap-2"
-        >
-          <Plus size={16} /> Add Suggestion
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {suggestions.length === 0 && (
-          <div className="text-center text-stone-400 py-12">
-            <MessageSquare size={48} className="mx-auto mb-2 opacity-20" />
-            <p>No suggestions yet.</p>
-          </div>
-        )}
-        {suggestions.map(s => (
-          <div key={s.id} className="p-4 bg-stone-50 rounded-xl border border-stone-100 flex gap-4 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex flex-col items-center gap-1">
-              <button 
-                onClick={() => voteSuggestion(s.id)}
-                className="p-1.5 rounded-lg hover:bg-stone-200 text-stone-400 hover:text-emerald-600 transition-colors"
-              >
-                <ThumbsUp size={18} />
-              </button>
-              <span className="text-xs font-bold text-stone-600">{s.votes}</span>
-            </div>
-            <div className="flex-grow">
-              <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-wrap">{s.text}</p>
-              <div className="text-[10px] text-stone-400 mt-2 font-mono">
-                {new Date(s.id).toLocaleDateString()} • {new Date(s.id).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-              </div>
-            </div>
-            <button 
-              onClick={() => deleteSuggestion(s.id)}
-              className="text-stone-300 hover:text-red-400 self-start"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 // --- MAIN COMPONENT ---
 export default function App() {
   const [view, setView] = useState("itinerary");
@@ -789,8 +680,6 @@ export default function App() {
             {[
               { id: 'itinerary', icon: LayoutDashboard, label: 'Itinerary' }, 
               { id: 'budget', icon: Wallet, label: 'Team Budget' }, 
-              { id: 'notes', icon: Notebook, label: 'Notebook' },
-              { id: 'suggestions', icon: MessageSquare, label: 'Suggestions' }
             ].map(item => (
               <button key={item.id} onClick={() => setView(item.id)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all whitespace-nowrap ${view === item.id ? "bg-emerald-900 text-white shadow-lg" : "hover:bg-stone-800 hover:text-stone-200"}`}><item.icon size={18} /><span className="font-medium">{item.label}</span></button>
             ))}
@@ -976,8 +865,6 @@ export default function App() {
           )}
 
           {view === 'budget' && <BudgetPlanner />}
-          {view === 'notes' && <NotesBoard />}
-          {view === 'suggestions' && <SuggestionBox />}
         </div>
       </main>
 
