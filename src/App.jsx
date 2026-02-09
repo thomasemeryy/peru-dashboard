@@ -34,7 +34,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Hostel",
     notes: "Spend the day exploring Lima - could organise a guided tour",
     coords: { x: 18, y: 55 },
-    img: "https://dynamic-media.tacdn.com/media/photo-o/2f/ba/e1/6f/caption.jpg?w=2400&h=-1&s=1"
+    img: "https://images.contentstack.io/v3/assets/blt06f605a34f1194ff/blt37ffa8000c66ba10/67eac919ca14b55ff38c5345/iStock-2155479982-HEADER.jpg?fit=crop&disable=upscale&auto=webp&quality=60&crop=smart&width=1920&height=1080"
   },
   {
     day: 3,
@@ -60,7 +60,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Guesthouse",
     notes: "Given a lesson on medicinal herbs used in the community.",
     coords: { x: 69, y: 70 },
-    img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS-_8_qwXeuo3727rApWvvDyclmL6QuhkLuXA&s"
+    img: "https://southadventureperutours.com/wp-content/uploads/2023/05/aeb32d2db438e9b3c69ddc4a3f4549afeac07bdf.jpg"
   },
   {
     day: 5,
@@ -73,7 +73,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Local Guesthouse (2-4 people/room)",
     notes: "Meet community and get an explanation of how the project works.",
     coords: { x: 70, y: 69 },
-    img: "https://upload.wikimedia.org/wikipedia/commons/2/2a/Sihuas01.jpg"
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Peru_-_54528594972.jpg/760px-Mapcarta.jpg"
   },
   {
     day: 6,
@@ -86,7 +86,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Local Guesthouse",
     notes: "",
     coords: { x: 70, y: 69 },
-    img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTGG1dL92Bspvd16kHmus5bdpvdt-e2zE-MtA&s"
+    img: "https://lh3.googleusercontent.com/gps-cs-s/AHVAweonJY6LJ6grXyiCoUg6dHVyZDi5orv3A2i47w867b08p4NVlnBEiMCLTa2z4CbRUO7sMi3YcAZOFojfLb5LP7B2jBoCLMXF4-5XQT1elDh_14A3sZEFDOJS4ngty1QIV9FH5bE8SQ=w1080-h624-n-k-no"
   },
   {
     day: 7,
@@ -468,6 +468,65 @@ const Calculator = ({ onAddExpense }) => {
   );
 };
 
+// --- ELEVATION GRAPH ---
+const TimelineScrubber = ({ itinerary, currentDay, onDayChange }) => {
+  const containerRef = useRef(null);
+  const rawData = useMemo(() => itinerary.map(d => ({
+    day: d.day,
+    alt: (d.altitude && d.altitude !== "Sea Level") ? parseInt(d.altitude.replace(/[^0-9]/g, '')) : 0,
+  })), [itinerary]);
+  const minAlt = 150; 
+  const maxAlt = 5200; 
+  const data = rawData.map(d => ({ ...d, clampedAlt: d.alt < minAlt ? minAlt : d.alt }));
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const normalizedHeight = (d.clampedAlt - minAlt) / (maxAlt - minAlt);
+    const y = 100 - (normalizedHeight * 100);
+    return `${x},${y}`;
+  }).join(' ');
+  const areaPath = `M 0,100 ${points} 100,100 Z`;
+  const handleInteraction = (e) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    const dayIndex = Math.round(percent * (data.length - 1));
+    const day = itinerary[dayIndex].day;
+    onDayChange(day);
+  };
+  const currentX = ((currentDay - 1) / (data.length - 1)) * 100;
+  
+  return (
+    <div className="bg-stone-900 p-4 rounded-xl border border-stone-700 shadow-xl mt-4 flex gap-4">
+      <div className="flex flex-col justify-between text-[10px] text-stone-500 font-mono py-1 text-right w-12 flex-shrink-0">
+        <span>5200m</span>
+        <span>4000m</span>
+        <span>2500m</span>
+        <span>150m</span>
+      </div>
+      <div className="flex-grow">
+        <div className="flex justify-between items-end mb-2">
+          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Mountain size={16} className="text-emerald-500"/> Elevation Profile</h3>
+          <span className="text-emerald-400 text-xs font-mono">Day {currentDay}: {itinerary[currentDay-1].altitude}</span>
+        </div>
+        <div ref={containerRef} className="relative h-32 w-full cursor-crosshair group border-b border-l border-stone-700" onMouseMove={(e) => e.buttons === 1 && handleInteraction(e)} onClick={handleInteraction}>
+          <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+            <defs>
+              <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor:"#10b981", stopOpacity:0.6}} /><stop offset="100%" style={{stopColor:"#10b981", stopOpacity:0.1}} /></linearGradient>
+            </defs>
+            <line x1="0" y1="25" x2="100" y2="25" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
+            <line x1="0" y1="75" x2="100" y2="75" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
+            <path d={areaPath} fill="url(#grad)" stroke="none" />
+            <polyline points={points} fill="none" stroke="#10b981" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </svg>
+          <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none transition-all duration-75" style={{ left: `${currentX}%` }}><div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-white rounded-full"></div></div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Budget Component
 const BudgetPlanner = () => {
   const [budget, setBudget] = useState(1000);
@@ -568,11 +627,22 @@ export default function App() {
           .print-full { width: 100% !important; margin: 0 !important; padding: 0 !important; }
           body { background: white; }
           .page-break { page-break-inside: avoid; }
-          /* Optimized print layout for smaller tiles */
-          .print-card-content { padding: 8px !important; }
-          .print-image { width: 100px !important; height: 100px !important; }
-          .print-text-sm { font-size: 10px !important; }
-          .print-hidden { display: none !important; }
+          /* Optimized 2-column print layout */
+          .print-grid {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 16px !important;
+          }
+          .print-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            page-break-inside: avoid;
+          }
+          .print-image { height: 100px !important; width: 100% !important; }
+          .print-content { padding: 8px !important; }
+          .print-text-xs { font-size: 10px !important; }
+          .print-text-sm { font-size: 11px !important; }
         }
       `}</style>
 
@@ -596,10 +666,10 @@ export default function App() {
       <main className="flex-grow p-4 md:p-8 h-screen overflow-y-auto print:h-auto print:overflow-visible print-full">
         <div className="max-w-5xl mx-auto h-full pb-20 print:pb-0">
           
-          {/* Header for Print Only */}
+          {/* Header - Hidden on Print */}
           <div className="hidden print:block mb-8 text-center border-b border-stone-200 pb-4">
              <h1 className="text-4xl font-bold text-stone-900 flex items-center justify-center gap-2"><Mountain className="text-stone-900" size={32} /> Peru Expedition 2026</h1>
-             <p className="text-stone-500 mt-2">Generated Itinerary & Plan</p>
+             <p className="text-stone-500 mt-2 print:hidden">Generated Itinerary & Plan</p>
           </div>
 
           {/* View: Itinerary */}
@@ -614,24 +684,26 @@ export default function App() {
                 <button onClick={handlePrint} className="flex items-center gap-2 bg-stone-800 text-white px-4 py-2 rounded-lg hover:bg-stone-700 text-sm shadow-md whitespace-nowrap"><Download size={16} /> Print / Save as PDF</button>
               </div>
 
-              <div className="space-y-6">
+              {/* Itinerary Grid/List */}
+              <div className="space-y-6 print:space-y-0 print-grid">
                 {filteredItinerary.map((item) => (
-                  <div key={item.day} className={`relative page-break ${editingId === item.day ? "z-10" : ""}`}>
+                  <div key={item.day} className={`relative page-break print-item ${editingId === item.day ? "z-10" : ""}`}>
                     
                     {/* Left Timeline Line (Hidden on Mobile and Print) */}
                     <div className="hidden md:block absolute left-[120px] top-0 bottom-0 w-0.5 bg-stone-200 -z-10 no-print"></div>
                     <div className="hidden md:block absolute left-[116px] top-8 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500 z-0 shadow-sm no-print"></div>
 
-                    <div className="flex flex-col md:flex-row gap-8 no-print-gap">
+                    <div className="flex flex-col md:flex-row gap-8 no-print-gap md:gap-8 gap-2 print:flex-col print:gap-0">
                       
                       {/* Date Column (Left) */}
-                      <div className="md:w-28 flex-shrink-0 flex md:flex-col items-center md:items-end md:text-right pt-7 print:pt-0 print:w-20 print:items-start print:text-left">
-                         <span className="text-2xl font-bold text-stone-400 print:text-lg">Day {item.day}</span>
-                         <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-2 print:mt-0 block">{item.date.split(' ').slice(0,3).join(' ')}</span>
+                      {/* Added gap-3 for mobile spacing */}
+                      <div className="md:w-28 flex-shrink-0 flex md:flex-col items-center md:items-end md:text-right gap-3 md:gap-0 pt-7 print:pt-2 print:px-2 print:w-full print:flex-row print:justify-between print:items-center print:border-b print:border-stone-100 print:bg-stone-50">
+                         <span className="text-2xl font-bold text-stone-400 print:text-sm print:text-stone-600">Day {item.day}</span>
+                         <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-2 mb-1 md:mb-0 print:mt-0 print:text-xs block">{item.date.split(' ').slice(0,3).join(' ')}</span>
                       </div>
 
                       {/* Card (Right) */}
-                      <div className="flex-grow flex flex-col md:flex-row bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden hover:shadow-md transition-shadow print:shadow-none print:border-stone-300">
+                      <div className="flex-grow flex flex-col md:flex-row bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden hover:shadow-md transition-shadow print:shadow-none print:border-none print:rounded-none print:flex-col">
                         
                         {/* Image Section */}
                         <div className="md:w-40 h-32 md:h-auto relative bg-stone-200 flex-shrink-0 print-image">
@@ -646,15 +718,15 @@ export default function App() {
                         </div>
 
                         {/* Content Section */}
-                        <div className="flex-grow p-4 md:p-5 flex flex-col justify-between print-card-content">
+                        <div className="flex-grow p-4 md:p-5 flex flex-col justify-between print-content">
                           <div>
                             <div className="flex justify-between items-start mb-2">
-                               <h3 className="font-bold text-lg text-stone-800 leading-tight print:text-base">{item.location}</h3>
+                               <h3 className="font-bold text-lg text-stone-800 leading-tight print:text-sm">{item.location}</h3>
                                <button onClick={() => handleEditClick(item)} className="text-stone-300 hover:text-stone-600 no-print"><Edit2 size={16} /></button>
                             </div>
 
                             {editingId === item.day ? (
-                              <div className="mt-2 bg-blue-50 p-4 rounded-lg space-y-3">
+                              <div className="mt-2 bg-blue-50 p-4 rounded-lg space-y-3 no-print">
                                  <div>
                                     <label className="text-xs font-bold text-blue-800 uppercase">Activity</label>
                                     <textarea name="activity" value={editForm.activity} onChange={handleChange} className="w-full p-2 rounded border border-blue-200 text-sm h-16 mt-1" />
@@ -729,11 +801,11 @@ export default function App() {
                                     ))}
                                   </div>
                                 )}
-                                <p className="text-stone-600 text-sm leading-relaxed mb-3 print-text-sm">{item.activity}</p>
+                                <p className="text-stone-600 text-sm leading-relaxed mb-3 print-text-xs">{item.activity}</p>
                                 
                                 {/* Restored & Styled Notes Field */}
                                 {item.notes && (
-                                  <div className="mt-3 flex items-start gap-2 text-xs text-stone-600 bg-stone-100 p-2 rounded border border-stone-200">
+                                  <div className="mt-3 flex items-start gap-2 text-xs text-stone-600 bg-stone-100 p-2 rounded border border-stone-200 print:text-[9px]">
                                     <NotebookPen size={14} className="mt-0.5 flex-shrink-0" />
                                     <span>{item.notes}</span>
                                   </div>
@@ -742,14 +814,14 @@ export default function App() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-3 pt-3 border-t border-stone-100 mt-auto">
+                          <div className="flex items-center gap-3 pt-3 border-t border-stone-100 mt-auto print:border-t-0 print:pt-1">
                             {item.accommodation && (
-                              <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                              <div className="flex items-center gap-1.5 text-xs text-stone-500 print:text-[9px]">
                                 <Moon size={14} className="text-indigo-400" /> {item.accommodation}
                               </div>
                             )}
                             {item.altitude && item.altitude !== "Sea Level" && (
-                              <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                              <div className="flex items-center gap-1.5 text-xs text-stone-500 print:text-[9px]">
                                 <Mountain size={14} className="text-emerald-500" /> {item.altitude}
                               </div>
                             )}
