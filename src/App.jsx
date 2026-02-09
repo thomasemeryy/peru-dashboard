@@ -468,98 +468,6 @@ const Calculator = ({ onAddExpense }) => {
   );
 };
 
-// --- ELEVATION GRAPH ---
-const TimelineScrubber = ({ itinerary, currentDay, onDayChange }) => {
-  const containerRef = useRef(null);
-  const rawData = useMemo(() => itinerary.map(d => ({
-    day: d.day,
-    alt: (d.altitude && d.altitude !== "Sea Level") ? parseInt(d.altitude.replace(/[^0-9]/g, '')) : 0,
-  })), [itinerary]);
-  const minAlt = 150; 
-  const maxAlt = 5200; 
-  const data = rawData.map(d => ({ ...d, clampedAlt: d.alt < minAlt ? minAlt : d.alt }));
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * 100;
-    const normalizedHeight = (d.clampedAlt - minAlt) / (maxAlt - minAlt);
-    const y = 100 - (normalizedHeight * 100);
-    return `${x},${y}`;
-  }).join(' ');
-  const areaPath = `M 0,100 ${points} 100,100 Z`;
-  const handleInteraction = (e) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percent = Math.max(0, Math.min(1, x / rect.width));
-    const dayIndex = Math.round(percent * (data.length - 1));
-    const day = itinerary[dayIndex].day;
-    onDayChange(day);
-  };
-  const currentX = ((currentDay - 1) / (data.length - 1)) * 100;
-  
-  return (
-    <div className="bg-stone-900 p-4 rounded-xl border border-stone-700 shadow-xl mt-4 flex gap-4">
-      <div className="flex flex-col justify-between text-[10px] text-stone-500 font-mono py-1 text-right w-12 flex-shrink-0">
-        <span>5200m</span>
-        <span>4000m</span>
-        <span>2500m</span>
-        <span>150m</span>
-      </div>
-      <div className="flex-grow">
-        <div className="flex justify-between items-end mb-2">
-          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Mountain size={16} className="text-emerald-500"/> Elevation Profile</h3>
-          <span className="text-emerald-400 text-xs font-mono">Day {currentDay}: {itinerary[currentDay-1].altitude}</span>
-        </div>
-        <div ref={containerRef} className="relative h-32 w-full cursor-crosshair group border-b border-l border-stone-700" onMouseMove={(e) => e.buttons === 1 && handleInteraction(e)} onClick={handleInteraction}>
-          <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-            <defs>
-              <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor:"#10b981", stopOpacity:0.6}} /><stop offset="100%" style={{stopColor:"#10b981", stopOpacity:0.1}} /></linearGradient>
-            </defs>
-            <line x1="0" y1="25" x2="100" y2="25" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
-            <line x1="0" y1="50" x2="100" y2="50" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
-            <line x1="0" y1="75" x2="100" y2="75" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
-            <path d={areaPath} fill="url(#grad)" stroke="none" />
-            <polyline points={points} fill="none" stroke="#10b981" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </svg>
-          <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none transition-all duration-75" style={{ left: `${currentX}%` }}><div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-white rounded-full"></div></div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Map Component
-const MapView = ({ itinerary }) => {
-  const [currentDay, setCurrentDay] = useState(1);
-  const selectedDayData = itinerary.find(d => d.day === currentDay);
-  const handleOpenGoogleMaps = (location) => {
-    const query = encodeURIComponent(`${location} Peru`);
-    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-  };
-  return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="bg-stone-900 rounded-xl overflow-hidden shadow-lg border border-stone-800 relative flex-grow min-h-[500px]" style={{ background: "linear-gradient(to bottom right, #1a2e1a, #0d1f2d)" }}>
-        <svg width="100%" height="100%" className="absolute inset-0 opacity-20 pointer-events-none"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#noise)" opacity="0.5"/></svg>
-        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full pointer-events-none opacity-30"><path d="M 15 25 L 30 15 L 50 20 L 80 20 L 90 45 L 95 65 L 80 90 L 65 95 L 45 90 L 25 75 L 15 55 Z" fill="none" stroke="white" strokeWidth="0.5" /></svg>
-        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full pointer-events-none"><polyline points={itinerary.map(i => `${i.coords.x},${i.coords.y}`).join(' ')} fill="none" stroke="#fbbf24" strokeWidth="0.5" strokeDasharray="1 1" className="opacity-60"/></svg>
-        {itinerary.map((item) => (
-          <button key={item.day} onClick={() => setCurrentDay(item.day)} className={`absolute transform -translate-x-1/2 -translate-y-1/2 group transition-all duration-300 ${currentDay === item.day ? "z-20 scale-110" : "z-10 scale-75 opacity-60 hover:opacity-100 hover:scale-90"}`} style={{ left: `${item.coords.x}%`, top: `${item.coords.y}%` }}>
-             {currentDay === item.day && <div className="absolute -inset-4 bg-emerald-500/30 rounded-full animate-ping"></div>}
-             <MapPin className={`${currentDay === item.day ? "text-emerald-400" : "text-stone-400"} drop-shadow-md`} fill={currentDay === item.day ? "#10b981" : "currentColor"} size={24} />
-          </button>
-        ))}
-        {selectedDayData && (
-          <div className="absolute top-4 right-4 max-w-xs bg-stone-900/90 backdrop-blur-md border border-stone-700 text-white p-4 rounded-lg shadow-2xl animate-in slide-in-from-top-4">
-             <div className="flex justify-between items-start mb-2"><span className="text-emerald-400 text-xs font-bold uppercase tracking-wider">Day {selectedDayData.day}</span><span className="text-stone-400 text-xs">{selectedDayData.date}</span></div>
-             <h2 className="text-lg font-bold mb-1">{selectedDayData.location}</h2>
-             <div className="flex gap-2 mt-3"><button onClick={() => handleOpenGoogleMaps(selectedDayData.location)} className="flex-1 flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs py-2 rounded transition-colors"><ExternalLink size={14} /> View on Google Maps</button></div>
-          </div>
-        )}
-      </div>
-      <TimelineScrubber itinerary={itinerary} currentDay={currentDay} onDayChange={setCurrentDay}/>
-    </div>
-  );
-};
-
 // Budget Component
 const BudgetPlanner = () => {
   const [budget, setBudget] = useState(1000);
@@ -660,6 +568,11 @@ export default function App() {
           .print-full { width: 100% !important; margin: 0 !important; padding: 0 !important; }
           body { background: white; }
           .page-break { page-break-inside: avoid; }
+          /* Optimized print layout for smaller tiles */
+          .print-card-content { padding: 8px !important; }
+          .print-image { width: 100px !important; height: 100px !important; }
+          .print-text-sm { font-size: 10px !important; }
+          .print-hidden { display: none !important; }
         }
       `}</style>
 
@@ -671,7 +584,7 @@ export default function App() {
             <p className="text-xs text-stone-500">Expedition Manager</p>
           </div>
           <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible w-full no-scrollbar">
-            {[{ id: 'itinerary', icon: LayoutDashboard, label: 'Itinerary' }, { id: 'map', icon: MapIcon, label: 'Expedition Map' }, { id: 'budget', icon: Wallet, label: 'Team Budget' }, { id: 'notes', icon: Notebook, label: 'Notebook' }].map(item => (
+            {[{ id: 'itinerary', icon: LayoutDashboard, label: 'Itinerary' }, { id: 'budget', icon: Wallet, label: 'Team Budget' }, { id: 'notes', icon: Notebook, label: 'Notebook' }].map(item => (
               <button key={item.id} onClick={() => setView(item.id)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all whitespace-nowrap ${view === item.id ? "bg-emerald-900 text-white shadow-lg" : "hover:bg-stone-800 hover:text-stone-200"}`}><item.icon size={18} /><span className="font-medium">{item.label}</span></button>
             ))}
           </div>
@@ -705,23 +618,23 @@ export default function App() {
                 {filteredItinerary.map((item) => (
                   <div key={item.day} className={`relative page-break ${editingId === item.day ? "z-10" : ""}`}>
                     
-                    {/* Left Timeline Line (Hidden on Mobile) */}
-                    <div className="hidden md:block absolute left-[120px] top-0 bottom-0 w-0.5 bg-stone-200 -z-10"></div>
-                    <div className="hidden md:block absolute left-[116px] top-8 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500 z-0 shadow-sm"></div>
+                    {/* Left Timeline Line (Hidden on Mobile and Print) */}
+                    <div className="hidden md:block absolute left-[120px] top-0 bottom-0 w-0.5 bg-stone-200 -z-10 no-print"></div>
+                    <div className="hidden md:block absolute left-[116px] top-8 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500 z-0 shadow-sm no-print"></div>
 
-                    <div className="flex flex-col md:flex-row gap-8">
+                    <div className="flex flex-col md:flex-row gap-8 no-print-gap">
                       
                       {/* Date Column (Left) */}
-                      <div className="md:w-28 flex-shrink-0 flex md:flex-col items-center md:items-end md:text-right pt-7">
-                         <span className="text-2xl font-bold text-stone-400">Day {item.day}</span>
-                         <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-1">{item.date.split(' ').slice(0,3).join(' ')}</span>
+                      <div className="md:w-28 flex-shrink-0 flex md:flex-col items-center md:items-end md:text-right pt-7 print:pt-0 print:w-20 print:items-start print:text-left">
+                         <span className="text-2xl font-bold text-stone-400 print:text-lg">Day {item.day}</span>
+                         <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-2 print:mt-0 block">{item.date.split(' ').slice(0,3).join(' ')}</span>
                       </div>
 
                       {/* Card (Right) */}
-                      <div className="flex-grow flex flex-col md:flex-row bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden hover:shadow-md transition-shadow">
+                      <div className="flex-grow flex flex-col md:flex-row bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden hover:shadow-md transition-shadow print:shadow-none print:border-stone-300">
                         
                         {/* Image Section */}
-                        <div className="md:w-40 h-32 md:h-auto relative bg-stone-200 flex-shrink-0">
+                        <div className="md:w-40 h-32 md:h-auto relative bg-stone-200 flex-shrink-0 print-image">
                           <img 
                             src={item.img?.startsWith('http') ? item.img : `https://loremflickr.com/400/400/${item.img || 'peru'}?lock=${item.day}`} 
                             alt={item.location} 
@@ -733,10 +646,10 @@ export default function App() {
                         </div>
 
                         {/* Content Section */}
-                        <div className="flex-grow p-4 md:p-5 flex flex-col justify-between">
+                        <div className="flex-grow p-4 md:p-5 flex flex-col justify-between print-card-content">
                           <div>
                             <div className="flex justify-between items-start mb-2">
-                               <h3 className="font-bold text-lg text-stone-800 leading-tight">{item.location}</h3>
+                               <h3 className="font-bold text-lg text-stone-800 leading-tight print:text-base">{item.location}</h3>
                                <button onClick={() => handleEditClick(item)} className="text-stone-300 hover:text-stone-600 no-print"><Edit2 size={16} /></button>
                             </div>
 
@@ -816,7 +729,7 @@ export default function App() {
                                     ))}
                                   </div>
                                 )}
-                                <p className="text-stone-600 text-sm leading-relaxed mb-3">{item.activity}</p>
+                                <p className="text-stone-600 text-sm leading-relaxed mb-3 print-text-sm">{item.activity}</p>
                                 
                                 {/* Restored & Styled Notes Field */}
                                 {item.notes && (
@@ -851,7 +764,6 @@ export default function App() {
             </div>
           )}
 
-          {view === 'map' && <MapView itinerary={itinerary} />}
           {view === 'budget' && <BudgetPlanner />}
           {view === 'notes' && <NotesBoard />}
         </div>
