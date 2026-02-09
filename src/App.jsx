@@ -5,7 +5,7 @@ import {
   Map as MapIcon, Wallet, Notebook, CheckSquare, AlertCircle,
   ExternalLink, Navigation, Calculator as CalcIcon, Grid, List, 
   Upload, Share2, Tent, Landmark, Palmtree, ArrowRight, ArrowDown, ArrowLeft,
-  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen
+  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen, MessageSquare, ThumbsUp
 } from 'lucide-react';
 
 // --- INITIAL DATA ---
@@ -118,7 +118,7 @@ const INITIAL_ITINERARY = [
     day: 9,
     date: "Mon 13th July 2026",
     location: "Sihua to Cusco",
-    category: "Rest",
+    category: "Free Time",
     altitude: "3400m",
     activity: "Say goodbye to community and transfer back to Cusco.",
     travelStats: [{ mode: 'Bus', time: 'Time TBC', details: 'Private Transfer' }],
@@ -317,7 +317,6 @@ const CategoryBadge = ({ category }) => {
     "Free Time": "bg-indigo-100 text-indigo-800 border-indigo-200",
   };
   
-  // New "Pill" Style logic - simplified to just return the color class, handled in parent for positioning
   return (
     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/90 backdrop-blur-sm shadow-sm ${
       category === 'Trek' ? 'text-green-700' :
@@ -538,8 +537,21 @@ const TimelineScrubber = ({ itinerary, currentDay, onDayChange }) => {
 
 // Budget Component
 const BudgetPlanner = () => {
-  const [budget, setBudget] = useState(1000);
-  const [items, setItems] = useState([]);
+  const [budget, setBudget] = useState(() => {
+    const saved = localStorage.getItem('peru-budget-total');
+    return saved ? JSON.parse(saved) : 1000;
+  });
+  
+  const [items, setItems] = useState(() => {
+    const saved = localStorage.getItem('peru-budget-items');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('peru-budget-total', JSON.stringify(budget));
+    localStorage.setItem('peru-budget-items', JSON.stringify(items));
+  }, [budget, items]);
+
   const handleAddExpense = ({ desc, cost }) => { setItems([...items, { id: Date.now(), desc, cost, currency: 'GBP' }]); };
   const totalSpent = items.reduce((acc, curr) => acc + parseFloat(curr.cost), 0);
   const remaining = budget - totalSpent;
@@ -575,7 +587,15 @@ const BudgetPlanner = () => {
 // Notes Component
 const NotesBoard = () => {
   const [activeTab, setActiveTab] = useState('packing');
-  const [notes, setNotes] = useState({ packing: ["Hiking boots", "Water purification tablets"], medical: ["Yellow Fever cert", "Altitude meds"], general: ["Check passport expiry"] });
+  const [notes, setNotes] = useState(() => {
+    const saved = localStorage.getItem('peru-notes');
+    return saved ? JSON.parse(saved) : { packing: ["Hiking boots", "Water purification tablets"], medical: ["Yellow Fever cert", "Altitude meds"], general: ["Check passport expiry"] };
+  });
+  
+  useEffect(() => {
+    localStorage.setItem('peru-notes', JSON.stringify(notes));
+  }, [notes]);
+
   const [newNote, setNewNote] = useState("");
   const addNote = () => { if (!newNote) return; setNotes({ ...notes, [activeTab]: [...notes[activeTab], newNote] }); setNewNote(""); };
   const removeNote = (category, index) => { const newCatNotes = [...notes[category]]; newCatNotes.splice(index, 1); setNotes({ ...notes, [category]: newCatNotes }); };
@@ -589,15 +609,110 @@ const NotesBoard = () => {
   );
 };
 
+// --- NEW SUGGESTION BOX COMPONENT ---
+const SuggestionBox = () => {
+  const [suggestions, setSuggestions] = useState(() => {
+    const saved = localStorage.getItem('peru-suggestions');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newSuggestion, setNewSuggestion] = useState("");
+
+  useEffect(() => {
+    localStorage.setItem('peru-suggestions', JSON.stringify(suggestions));
+  }, [suggestions]);
+
+  const addSuggestion = () => {
+    if (!newSuggestion.trim()) return;
+    setSuggestions([{ id: Date.now(), text: newSuggestion, votes: 0 }, ...suggestions]);
+    setNewSuggestion("");
+  };
+
+  const voteSuggestion = (id) => {
+    setSuggestions(suggestions.map(s => s.id === id ? { ...s, votes: s.votes + 1 } : s));
+  };
+
+  const deleteSuggestion = (id) => {
+    setSuggestions(suggestions.filter(s => s.id !== id));
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 min-h-[600px]">
+      <h2 className="text-xl font-bold text-stone-800 mb-6 flex items-center gap-2">
+        <MessageSquare className="text-emerald-600" /> Group Suggestions
+      </h2>
+      
+      <div className="mb-8">
+        <textarea 
+          value={newSuggestion}
+          onChange={(e) => setNewSuggestion(e.target.value)}
+          placeholder="Paste ideas from group chat or type a suggestion..."
+          className="w-full p-4 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-100 min-h-[100px] text-sm"
+        />
+        <button 
+          onClick={addSuggestion}
+          className="mt-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center gap-2"
+        >
+          <Plus size={16} /> Add Suggestion
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {suggestions.length === 0 && (
+          <div className="text-center text-stone-400 py-12">
+            <MessageSquare size={48} className="mx-auto mb-2 opacity-20" />
+            <p>No suggestions yet.</p>
+          </div>
+        )}
+        {suggestions.map(s => (
+          <div key={s.id} className="p-4 bg-stone-50 rounded-xl border border-stone-100 flex gap-4 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex flex-col items-center gap-1">
+              <button 
+                onClick={() => voteSuggestion(s.id)}
+                className="p-1.5 rounded-lg hover:bg-stone-200 text-stone-400 hover:text-emerald-600 transition-colors"
+              >
+                <ThumbsUp size={18} />
+              </button>
+              <span className="text-xs font-bold text-stone-600">{s.votes}</span>
+            </div>
+            <div className="flex-grow">
+              <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-wrap">{s.text}</p>
+              <div className="text-[10px] text-stone-400 mt-2 font-mono">
+                {new Date(s.id).toLocaleDateString()} • {new Date(s.id).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              </div>
+            </div>
+            <button 
+              onClick={() => deleteSuggestion(s.id)}
+              className="text-stone-300 hover:text-red-400 self-start"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN COMPONENT ---
 export default function App() {
   const [view, setView] = useState("itinerary");
-  const [itinerary, setItinerary] = useState(INITIAL_ITINERARY);
+  
+  // Persist Itinerary in LocalStorage
+  const [itinerary, setItinerary] = useState(() => {
+    const saved = localStorage.getItem('peru-itinerary');
+    return saved ? JSON.parse(saved) : INITIAL_ITINERARY;
+  });
+
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [filter, setFilter] = useState("All");
   const [showDataModal, setShowDataModal] = useState(false);
   const [dataString, setDataString] = useState("");
+
+  // Save to LocalStorage whenever itinerary changes
+  useEffect(() => {
+    localStorage.setItem('peru-itinerary', JSON.stringify(itinerary));
+  }, [itinerary]);
 
   const handleEditClick = (item) => { setEditingId(item.day); setEditForm({ ...item, travelStats: item.travelStats || [] }); };
   const handleSave = () => { setItinerary(itinerary.map(item => item.day === editingId ? editForm : item)); setEditingId(null); };
@@ -649,9 +764,17 @@ export default function App() {
             page-break-inside: avoid;
           }
           .print-image { height: 100px !important; width: 100% !important; }
-          .print-content { padding: 8px !important; }
+          .print-content { 
+            padding: 8px !important; 
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            flex-grow: 1 !important;
+          }
           .print-text-xs { font-size: 10px !important; }
           .print-text-sm { font-size: 11px !important; }
+          /* Ensure footer stays at bottom */
+          .print-footer { margin-top: auto !important; }
         }
       `}</style>
 
@@ -663,7 +786,12 @@ export default function App() {
             <p className="text-xs text-stone-500">Expedition Manager</p>
           </div>
           <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible w-full no-scrollbar">
-            {[{ id: 'itinerary', icon: LayoutDashboard, label: 'Itinerary' }, { id: 'budget', icon: Wallet, label: 'Team Budget' }, { id: 'notes', icon: Notebook, label: 'Notebook' }].map(item => (
+            {[
+              { id: 'itinerary', icon: LayoutDashboard, label: 'Itinerary' }, 
+              { id: 'budget', icon: Wallet, label: 'Team Budget' }, 
+              { id: 'notes', icon: Notebook, label: 'Notebook' },
+              { id: 'suggestions', icon: MessageSquare, label: 'Suggestions' }
+            ].map(item => (
               <button key={item.id} onClick={() => setView(item.id)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all whitespace-nowrap ${view === item.id ? "bg-emerald-900 text-white shadow-lg" : "hover:bg-stone-800 hover:text-stone-200"}`}><item.icon size={18} /><span className="font-medium">{item.label}</span></button>
             ))}
           </div>
@@ -723,7 +851,7 @@ export default function App() {
                           />
                           
                           {/* New Pill Style Category */}
-                          <div className="absolute top-2 left-2 z-10">
+                          <div className="absolute top-0.5 left-1.5 z-10">
                             <CategoryBadge category={item.category} />
                           </div>
                         </div>
@@ -825,7 +953,7 @@ export default function App() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-3 pt-3 border-t border-stone-100 mt-auto print:border-t-0 print:pt-1">
+                          <div className="flex items-center gap-3 pt-3 border-t border-stone-100 mt-auto print:border-t-0 print:pt-1 print-footer">
                             {item.accommodation && (
                               <div className="flex items-center gap-1.5 text-xs text-stone-500 print:text-[9px]">
                                 <Moon size={14} className="text-indigo-400" /> {item.accommodation}
@@ -849,6 +977,7 @@ export default function App() {
 
           {view === 'budget' && <BudgetPlanner />}
           {view === 'notes' && <NotesBoard />}
+          {view === 'suggestions' && <SuggestionBox />}
         </div>
       </main>
 
