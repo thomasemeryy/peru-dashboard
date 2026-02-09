@@ -253,20 +253,20 @@ const INITIAL_ITINERARY = [
     day: 19,
     date: "Thu 23rd July 2026",
     location: "Taquile to Puno",
-    category: "Travel",
+    category: "Culture",
     altitude: "3800m",
     activity: "After breakfast, take boat to Uros Islands and explore floating islands, before taking bus to Puno. Catch night bus to Lima.",
     travelStats: [{ mode: 'Boat', time: 'Morning', details: 'Uros Islands' }, { mode: 'Bus', time: 'Afternoon', details: 'Puno' }, { mode: 'Bus', time: 'Night', details: 'Lima' }],
     accommodation: "Overnight: Night bus",
     notes: "Look forward to sleeping on a bus!",
     coords: { x: 77, y: 82 },
-    img: "https://www.salkantaytrekking.com/blog/wp-content/uploads/2024/11/Uros-Island-1024x683.jpg"
+    img: "https://machupicchuviajesperu.com/wp-content/uploads/2025/06/Uros-Island-in-Puno-scaled.webp"
   },
   {
     day: 20,
     date: "Fri 24th July 2026",
     location: "Puno to Lima",
-    category: "Travel",
+    category: "Free Time",
     altitude: "150m",
     activity: "Arrive in Lima, enjoy breakfast then transfer to hostel to enjoy an afternoon of sightseeing.",
     travelStats: [{ mode: 'Bus', time: 'Morning', details: 'Wake up!' }, { mode: 'Bus', time: 'Morning', details: 'Hostel transfer' }],
@@ -316,8 +316,17 @@ const CategoryBadge = ({ category }) => {
     Culture: "bg-pink-100 text-pink-800 border-pink-200",
     "Free Time": "bg-indigo-100 text-indigo-800 border-indigo-200",
   };
+  
+  // New "Pill" Style logic - simplified to just return the color class, handled in parent for positioning
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${colors[category] || "bg-gray-100"}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/90 backdrop-blur-sm shadow-sm ${
+      category === 'Trek' ? 'text-green-700' :
+      category === 'Travel' ? 'text-blue-700' :
+      category === 'Project' ? 'text-orange-700' :
+      category === 'Highlight' ? 'text-yellow-700' :
+      category === 'Culture' ? 'text-pink-700' :
+      'text-stone-700'
+    }`}>
       {category}
     </span>
   );
@@ -712,13 +721,15 @@ export default function App() {
                             alt={item.location} 
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                            <div className="text-white text-[10px] font-bold uppercase tracking-wider">{item.category}</div>
+                          
+                          {/* New Pill Style Category */}
+                          <div className="absolute top-2 left-2 z-10">
+                            <CategoryBadge category={item.category} />
                           </div>
                         </div>
 
                         {/* Content Section */}
-                        <div className="flex-grow p-4 md:p-5 flex flex-col justify-between print-content">
+                        <div className="flex-grow p-6 md:p-6 flex flex-col justify-between print-content">
                           <div>
                             <div className="flex justify-between items-start mb-2">
                                <h3 className="font-bold text-lg text-stone-800 leading-tight print:text-sm">{item.location}</h3>
