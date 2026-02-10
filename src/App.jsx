@@ -10,7 +10,7 @@ import {
 
 // Import Firebase (Make sure you ran: npm install firebase)
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, increment } from "firebase/firestore";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, increment, setDoc, getDoc } from "firebase/firestore";
 
 // --- PASTE YOUR FIREBASE CONFIG HERE ---
 // Get these from your Firebase Console > Project Settings
@@ -501,32 +501,157 @@ const Calculator = ({ onAddExpense }) => {
   );
 };
 
+// --- ELEVATION GRAPH ---
+const TimelineScrubber = ({ itinerary, currentDay, onDayChange }) => {
+  const containerRef = useRef(null);
+  const rawData = useMemo(() => itinerary.map(d => ({
+    day: d.day,
+    alt: (d.altitude && d.altitude !== "Sea Level") ? parseInt(d.altitude.replace(/[^0-9]/g, '')) : 0,
+  })), [itinerary]);
+  const minAlt = 150; 
+  const maxAlt = 5200; 
+  const data = rawData.map(d => ({ ...d, clampedAlt: d.alt < minAlt ? minAlt : d.alt }));
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const normalizedHeight = (d.clampedAlt - minAlt) / (maxAlt - minAlt);
+    const y = 100 - (normalizedHeight * 100);
+    return `${x},${y}`;
+  }).join(' ');
+  const areaPath = `M 0,100 ${points} 100,100 Z`;
+  const handleInteraction = (e) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    const dayIndex = Math.round(percent * (data.length - 1));
+    const day = itinerary[dayIndex].day;
+    onDayChange(day);
+  };
+  const currentX = ((currentDay - 1) / (data.length - 1)) * 100;
+  
+  return (
+    <div className="bg-stone-900 p-4 rounded-xl border border-stone-700 shadow-xl mt-4 flex gap-4">
+      <div className="flex flex-col justify-between text-[10px] text-stone-500 font-mono py-1 text-right w-12 flex-shrink-0">
+        <span>5200m</span>
+        <span>4000m</span>
+        <span>2500m</span>
+        <span>150m</span>
+      </div>
+      <div className="flex-grow">
+        <div className="flex justify-between items-end mb-2">
+          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Mountain size={16} className="text-emerald-500"/> Elevation Profile</h3>
+          <span className="text-emerald-400 text-xs font-mono">Day {currentDay}: {itinerary[currentDay-1].altitude}</span>
+        </div>
+        <div ref={containerRef} className="relative h-32 w-full cursor-crosshair group border-b border-l border-stone-700" onMouseMove={(e) => e.buttons === 1 && handleInteraction(e)} onClick={handleInteraction}>
+          <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+            <defs>
+              <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor:"#10b981", stopOpacity:0.6}} /><stop offset="100%" style={{stopColor:"#10b981", stopOpacity:0.1}} /></linearGradient>
+            </defs>
+            <line x1="0" y1="25" x2="100" y2="25" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
+            <line x1="0" y1="75" x2="100" y2="75" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
+            <path d={areaPath} fill="url(#grad)" stroke="none" />
+            <polyline points={points} fill="none" stroke="#10b981" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </svg>
+          <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none transition-all duration-75" style={{ left: `${currentX}%` }}><div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-white rounded-full"></div></div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Budget Component
 const BudgetPlanner = () => {
-  const [budget, setBudget] = useState(() => {
-    const saved = localStorage.getItem('peru-budget-total');
-    return saved ? JSON.parse(saved) : 1000;
-  });
-  
-  const [items, setItems] = useState(() => {
-    const saved = localStorage.getItem('peru-budget-items');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [budget, setBudget] = useState(1000); // Default local fallback
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Sync Total Budget (Settings) & Items from Firebase
   useEffect(() => {
-    localStorage.setItem('peru-budget-total', JSON.stringify(budget));
-    localStorage.setItem('peru-budget-items', JSON.stringify(items));
-  }, [budget, items]);
+    if (!db) {
+      setLoading(false);
+      return;
+    }
 
-  const handleAddExpense = ({ desc, cost }) => { setItems([...items, { id: Date.now(), desc, cost, currency: 'GBP' }]); };
+    // Listener for Budget Items
+    const q = query(collection(db, "budget_items"), orderBy("createdAt", "desc"));
+    const unsubscribeItems = onSnapshot(q, (snapshot) => {
+      const liveItems = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setItems(liveItems);
+      setLoading(false);
+    });
+
+    // Listener for Total Budget
+    const settingsRef = doc(db, "settings", "global_budget");
+    const unsubscribeBudget = onSnapshot(settingsRef, (doc) => {
+      if (doc.exists()) {
+        setBudget(doc.data().total);
+      }
+    });
+
+    return () => {
+      unsubscribeItems();
+      unsubscribeBudget();
+    };
+  }, []);
+
+  const handleAddExpense = async ({ desc, cost }) => {
+    if (!db) return;
+    try {
+      await addDoc(collection(db, "budget_items"), {
+        desc,
+        cost,
+        currency: 'GBP',
+        createdAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error("Error adding expense:", e);
+    }
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!db) return;
+    if (!confirm("Delete this expense?")) return;
+    try {
+      await deleteDoc(doc(db, "budget_items", id));
+    } catch (e) {
+      console.error("Error deleting expense:", e);
+    }
+  };
+
+  const handleUpdateBudget = async (newTotal) => {
+    if (!db) return;
+    try {
+      await setDoc(doc(db, "settings", "global_budget"), { total: newTotal }, { merge: true });
+      // State updates automatically via listener
+    } catch (e) {
+      console.error("Error updating budget total:", e);
+    }
+  };
+
   const totalSpent = items.reduce((acc, curr) => acc + parseFloat(curr.cost), 0);
   const remaining = budget - totalSpent;
+
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 min-h-[600px]">
       <div className="flex flex-wrap justify-between items-center mb-8 bg-stone-50 p-4 rounded-xl border border-stone-100">
-        <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2"><Wallet className="text-emerald-600" /> Team Budget</h2>
+        <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2"><Wallet className="text-emerald-600" /> Team Budget (Live)</h2>
         <div className="flex items-center gap-6">
-           <div className="text-right"><div className="text-xs font-bold text-stone-400 uppercase">Budget</div><div className="flex items-center justify-end"><span className="text-stone-400 font-bold mr-1">£</span><input type="number" value={budget} onChange={(e) => setBudget(parseFloat(e.target.value))} className="w-20 bg-transparent font-bold text-xl text-stone-800 text-right outline-none border-b border-dashed border-stone-300" /></div></div>
+           <div className="text-right">
+             <div className="text-xs font-bold text-stone-400 uppercase">Budget</div>
+             <div className="flex items-center justify-end">
+               <span className="text-stone-400 font-bold mr-1">£</span>
+               <input 
+                 type="number" 
+                 value={budget} 
+                 onChange={(e) => handleUpdateBudget(parseFloat(e.target.value))} 
+                 className="w-20 bg-transparent font-bold text-xl text-stone-800 text-right outline-none border-b border-dashed border-stone-300" 
+               />
+             </div>
+           </div>
            <div className="text-right"><div className="text-xs font-bold text-blue-500 uppercase">Spent</div><div className="font-bold text-xl text-blue-600">£{totalSpent.toFixed(2)}</div></div>
            <div className="text-right"><div className="text-xs font-bold text-emerald-500 uppercase">Remaining</div><div className="font-bold text-xl text-emerald-600">£{remaining.toFixed(2)}</div></div>
         </div>
@@ -536,11 +661,19 @@ const BudgetPlanner = () => {
         <div className="md:w-1/2 lg:w-7/12">
           <h3 className="text-lg font-bold text-stone-700 mb-4 flex items-center gap-2"><List size={20}/> Expense Log</h3>
           <div className="space-y-3 h-[500px] overflow-y-auto pr-2">
-            {items.length === 0 && <div className="flex flex-col items-center justify-center h-48 text-stone-400 border-2 border-dashed border-stone-200 rounded-xl"><Wallet size={48} className="mb-2 opacity-20" /><p>No expenses added yet.</p></div>}
-            {[...items].reverse().map(item => (
+            {loading && <p className="text-stone-400 text-center">Syncing...</p>}
+            {!loading && items.length === 0 && <div className="flex flex-col items-center justify-center h-48 text-stone-400 border-2 border-dashed border-stone-200 rounded-xl"><Wallet size={48} className="mb-2 opacity-20" /><p>No expenses added yet.</p></div>}
+            
+            {items.map(item => (
               <div key={item.id} className="flex justify-between items-center p-4 bg-white rounded-xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow">
-                <div><div className="font-bold text-stone-800 text-lg">{item.desc}</div><div className="text-xs text-stone-400 font-mono">ID: {item.id.toString().slice(-4)}</div></div>
-                <div className="flex items-center gap-4"><span className="font-bold text-xl text-stone-800">£{parseFloat(item.cost).toFixed(2)}</span><button onClick={() => setItems(items.filter(i => i.id !== item.id))} className="text-stone-300 hover:text-red-500 p-2 rounded-full hover:bg-stone-50 transition-colors"><Trash2 size={18} /></button></div>
+                <div>
+                  <div className="font-bold text-stone-800 text-lg">{item.desc}</div>
+                  <div className="text-xs text-stone-400 font-mono">ID: {item.id.slice(-4)}</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="font-bold text-xl text-stone-800">£{parseFloat(item.cost).toFixed(2)}</span>
+                  <button onClick={() => handleDeleteExpense(item.id)} className="text-stone-300 hover:text-red-500 p-2 rounded-full hover:bg-stone-50 transition-colors"><Trash2 size={18} /></button>
+                </div>
               </div>
             ))}
           </div>
@@ -557,9 +690,11 @@ const SuggestionBox = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState("votes"); // "votes" or "newest"
-  const [votedItems, setVotedItems] = useState(() => {
-    const saved = localStorage.getItem('peru-voted-suggestions');
-    return saved ? JSON.parse(saved) : [];
+  
+  // Track specific vote status: 'up', 'down', or undefined per suggestion ID
+  const [userVotes, setUserVotes] = useState(() => {
+    const saved = localStorage.getItem('peru-user-votes');
+    return saved ? JSON.parse(saved) : {};
   });
 
   // 1. Subscribe to Live Updates
@@ -609,26 +744,69 @@ const SuggestionBox = () => {
     }
   };
 
-  // 3. Vote (Update DB)
-  const voteSuggestion = async (id, change) => {
+  // 3. Vote (Update DB & Toggle State)
+  const handleVote = async (id, type) => {
     if (!db) return;
     
-    // Check if already voted
-    if (votedItems.includes(id)) {
-        return; // Do nothing if already voted
+    const currentVote = userVotes[id]; // 'up' | 'down' | undefined
+    let change = 0;
+    let newVoteState = currentVote;
+
+    if (type === 'up') {
+      if (currentVote === 'up') {
+        change = -1; // Toggle off
+        newVoteState = undefined;
+      } else if (currentVote === 'down') {
+        change = 2; // Switch -1 to +1
+        newVoteState = 'up';
+      } else {
+        change = 1; // New vote
+        newVoteState = 'up';
+      }
+    } else if (type === 'down') {
+      if (currentVote === 'down') {
+        change = 1; // Toggle off
+        newVoteState = undefined;
+      } else if (currentVote === 'up') {
+        change = -2; // Switch +1 to -1
+        newVoteState = 'down';
+      } else {
+        change = -1; // New vote
+        newVoteState = 'down';
+      }
     }
+
+    if (change === 0) return;
+
+    // Optimistic Update
+    const updatedVotes = { ...userVotes };
+    if (newVoteState) {
+      updatedVotes[id] = newVoteState;
+    } else {
+      delete updatedVotes[id];
+    }
+    setUserVotes(updatedVotes);
+    localStorage.setItem('peru-user-votes', JSON.stringify(updatedVotes));
 
     try {
       const ref = doc(db, "suggestions", id);
       await updateDoc(ref, {
         votes: increment(change)
       });
-      
-      const newVotedItems = [...votedItems, id];
-      setVotedItems(newVotedItems);
-      localStorage.setItem('peru-voted-suggestions', JSON.stringify(newVotedItems));
     } catch (e) {
       console.error("Error updating vote:", e);
+      // Rollback could go here if needed
+    }
+  };
+
+  // 4. Delete (Remove from DB)
+  const deleteSuggestion = async (id) => {
+    if (!db) return;
+    if (!confirm("Delete this suggestion for everyone?")) return;
+    try {
+      await deleteDoc(doc(db, "suggestions", id));
+    } catch (e) {
+      console.error("Error deleting:", e);
     }
   };
 
@@ -735,7 +913,9 @@ const SuggestionBox = () => {
               </div>
             )}
 
-            {sortedSuggestions.map(s => (
+            {sortedSuggestions.map(s => {
+              const userVote = userVotes[s.id];
+              return (
               <div key={s.id} className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex flex-col md:flex-row">
                   {/* Image (if exists) */}
@@ -749,19 +929,17 @@ const SuggestionBox = () => {
                     {/* Votes */}
                     <div className="flex flex-col items-center justify-center gap-1 bg-stone-50 p-2 rounded-lg h-fit border border-stone-100">
                       <button 
-                        onClick={() => voteSuggestion(s.id, 1)} 
-                        disabled={votedItems.includes(s.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${votedItems.includes(s.id) ? "text-stone-300 cursor-not-allowed" : "hover:bg-stone-200 text-stone-400 hover:text-emerald-500"}`}
+                        onClick={() => handleVote(s.id, 'up')} 
+                        className={`p-1.5 rounded-lg transition-colors ${userVote === 'up' ? "bg-emerald-100 text-emerald-600" : "hover:bg-stone-200 text-stone-400 hover:text-emerald-500"}`}
                       >
-                        <ThumbsUp size={16} />
+                        <ThumbsUp size={16} fill={userVote === 'up' ? "currentColor" : "none"} />
                       </button>
                       <span className="font-bold text-stone-700 text-sm">{s.votes || 0}</span>
                       <button 
-                        onClick={() => voteSuggestion(s.id, -1)} 
-                        disabled={votedItems.includes(s.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${votedItems.includes(s.id) ? "text-stone-300 cursor-not-allowed" : "hover:bg-stone-200 text-stone-400 hover:text-red-500"}`}
+                        onClick={() => handleVote(s.id, 'down')} 
+                        className={`p-1.5 rounded-lg transition-colors ${userVote === 'down' ? "bg-red-100 text-red-600" : "hover:bg-stone-200 text-stone-400 hover:text-red-500"}`}
                       >
-                        <ThumbsDown size={16} />
+                        <ThumbsDown size={16} fill={userVote === 'down' ? "currentColor" : "none"} />
                       </button>
                     </div>
 
@@ -777,12 +955,13 @@ const SuggestionBox = () => {
                       <p className="text-stone-600 text-sm leading-relaxed mb-3">{s.text}</p>
                       <div className="flex justify-between items-center text-[10px] text-stone-400 border-t border-stone-100 pt-2">
                         <span className="flex items-center gap-1"><Cloud size={10} /> {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'Just now'}</span>
+                        <button onClick={() => deleteSuggestion(s.id)} className="text-stone-300 hover:text-red-400 flex items-center gap-1 hover:underline"><Trash2 size={12}/> Delete</button>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </>
       )}
