@@ -604,7 +604,7 @@ const BudgetPlanner = () => {
       await addDoc(collection(db, "budget_items"), {
         desc,
         cost,
-        currency: 'GBP',
+        currency: 'USD',
         createdAt: new Date().toISOString()
       });
     } catch (e) {
@@ -638,12 +638,12 @@ const BudgetPlanner = () => {
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 min-h-[600px]">
       <div className="flex flex-wrap justify-between items-center mb-8 bg-stone-50 p-4 rounded-xl border border-stone-100">
-        <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2"><Wallet className="text-emerald-600" /> Team Budget (Live)</h2>
+        <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2"><Wallet className="text-emerald-600" /> Team Budget</h2>
         <div className="flex items-center gap-6">
            <div className="text-right">
              <div className="text-xs font-bold text-stone-400 uppercase">Budget</div>
              <div className="flex items-center justify-end">
-               <span className="text-stone-400 font-bold mr-1">£</span>
+               <span className="text-stone-400 font-bold mr-1">$</span>
                <input 
                  type="number" 
                  value={budget} 
@@ -652,8 +652,8 @@ const BudgetPlanner = () => {
                />
              </div>
            </div>
-           <div className="text-right"><div className="text-xs font-bold text-blue-500 uppercase">Spent</div><div className="font-bold text-xl text-blue-600">£{totalSpent.toFixed(2)}</div></div>
-           <div className="text-right"><div className="text-xs font-bold text-emerald-500 uppercase">Remaining</div><div className="font-bold text-xl text-emerald-600">£{remaining.toFixed(2)}</div></div>
+           <div className="text-right"><div className="text-xs font-bold text-blue-500 uppercase">Spent</div><div className="font-bold text-xl text-blue-600">${totalSpent.toFixed(2)}</div></div>
+           <div className="text-right"><div className="text-xs font-bold text-emerald-500 uppercase">Remaining</div><div className="font-bold text-xl text-emerald-600">${remaining.toFixed(2)}</div></div>
         </div>
       </div>
       <div className="flex flex-col md:flex-row gap-12">
@@ -668,10 +668,9 @@ const BudgetPlanner = () => {
               <div key={item.id} className="flex justify-between items-center p-4 bg-white rounded-xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow">
                 <div>
                   <div className="font-bold text-stone-800 text-lg">{item.desc}</div>
-                  <div className="text-xs text-stone-400 font-mono">ID: {item.id.slice(-4)}</div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="font-bold text-xl text-stone-800">£{parseFloat(item.cost).toFixed(2)}</span>
+                  <span className="font-bold text-xl text-stone-800">${parseFloat(item.cost).toFixed(2)}</span>
                   <button onClick={() => handleDeleteExpense(item.id)} className="text-stone-300 hover:text-red-500 p-2 rounded-full hover:bg-stone-50 transition-colors"><Trash2 size={18} /></button>
                 </div>
               </div>
@@ -796,17 +795,6 @@ const SuggestionBox = () => {
     } catch (e) {
       console.error("Error updating vote:", e);
       // Rollback could go here if needed
-    }
-  };
-
-  // 4. Delete (Remove from DB)
-  const deleteSuggestion = async (id) => {
-    if (!db) return;
-    if (!confirm("Delete this suggestion for everyone?")) return;
-    try {
-      await deleteDoc(doc(db, "suggestions", id));
-    } catch (e) {
-      console.error("Error deleting:", e);
     }
   };
 
@@ -955,7 +943,6 @@ const SuggestionBox = () => {
                       <p className="text-stone-600 text-sm leading-relaxed mb-3">{s.text}</p>
                       <div className="flex justify-between items-center text-[10px] text-stone-400 border-t border-stone-100 pt-2">
                         <span className="flex items-center gap-1"><Cloud size={10} /> {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'Just now'}</span>
-                        <button onClick={() => deleteSuggestion(s.id)} className="text-stone-300 hover:text-red-400 flex items-center gap-1 hover:underline"><Trash2 size={12}/> Delete</button>
                       </div>
                     </div>
                   </div>
