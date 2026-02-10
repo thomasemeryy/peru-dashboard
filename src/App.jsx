@@ -5,8 +5,33 @@ import {
   Map as MapIcon, Wallet, Notebook, CheckSquare, AlertCircle,
   ExternalLink, Navigation, Calculator as CalcIcon, Grid, List, 
   Upload, Share2, Tent, Landmark, Palmtree, ArrowRight, ArrowDown, ArrowLeft,
-  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen
+  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen, MessageSquare, ThumbsUp, Cloud, ThumbsDown, Filter, User
 } from 'lucide-react';
+
+// Import Firebase (Make sure you ran: npm install firebase)
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, increment } from "firebase/firestore";
+
+// --- PASTE YOUR FIREBASE CONFIG HERE ---
+// Get these from your Firebase Console > Project Settings
+const firebaseConfig = {
+  apiKey: "AIzaSyAM0_BC_4qClWU3433b8sXTGqUvkxptan4",
+  authDomain: "perudashboard.firebaseapp.com",
+  projectId: "perudashboard",
+  storageBucket: "perudashboard.firebasestorage.app",
+  messagingSenderId: "923183455968",
+  appId: "1:923183455968:web:81272842697b026b5f3a85",
+  measurementId: "G-QB7X333KZF"
+};
+
+// Initialize Firebase
+let db;
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+} catch (error) {
+  console.log("Firebase not configured yet. See instructions.");
+}
 
 // --- INITIAL DATA ---
 const INITIAL_ITINERARY = [
@@ -476,65 +501,6 @@ const Calculator = ({ onAddExpense }) => {
   );
 };
 
-// --- ELEVATION GRAPH ---
-const TimelineScrubber = ({ itinerary, currentDay, onDayChange }) => {
-  const containerRef = useRef(null);
-  const rawData = useMemo(() => itinerary.map(d => ({
-    day: d.day,
-    alt: (d.altitude && d.altitude !== "Sea Level") ? parseInt(d.altitude.replace(/[^0-9]/g, '')) : 0,
-  })), [itinerary]);
-  const minAlt = 150; 
-  const maxAlt = 5200; 
-  const data = rawData.map(d => ({ ...d, clampedAlt: d.alt < minAlt ? minAlt : d.alt }));
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * 100;
-    const normalizedHeight = (d.clampedAlt - minAlt) / (maxAlt - minAlt);
-    const y = 100 - (normalizedHeight * 100);
-    return `${x},${y}`;
-  }).join(' ');
-  const areaPath = `M 0,100 ${points} 100,100 Z`;
-  const handleInteraction = (e) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percent = Math.max(0, Math.min(1, x / rect.width));
-    const dayIndex = Math.round(percent * (data.length - 1));
-    const day = itinerary[dayIndex].day;
-    onDayChange(day);
-  };
-  const currentX = ((currentDay - 1) / (data.length - 1)) * 100;
-  
-  return (
-    <div className="bg-stone-900 p-4 rounded-xl border border-stone-700 shadow-xl mt-4 flex gap-4">
-      <div className="flex flex-col justify-between text-[10px] text-stone-500 font-mono py-1 text-right w-12 flex-shrink-0">
-        <span>5200m</span>
-        <span>4000m</span>
-        <span>2500m</span>
-        <span>150m</span>
-      </div>
-      <div className="flex-grow">
-        <div className="flex justify-between items-end mb-2">
-          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Mountain size={16} className="text-emerald-500"/> Elevation Profile</h3>
-          <span className="text-emerald-400 text-xs font-mono">Day {currentDay}: {itinerary[currentDay-1].altitude}</span>
-        </div>
-        <div ref={containerRef} className="relative h-32 w-full cursor-crosshair group border-b border-l border-stone-700" onMouseMove={(e) => e.buttons === 1 && handleInteraction(e)} onClick={handleInteraction}>
-          <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-            <defs>
-              <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor:"#10b981", stopOpacity:0.6}} /><stop offset="100%" style={{stopColor:"#10b981", stopOpacity:0.1}} /></linearGradient>
-            </defs>
-            <line x1="0" y1="25" x2="100" y2="25" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
-            <line x1="0" y1="50" x2="100" y2="50" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
-            <line x1="0" y1="75" x2="100" y2="75" stroke="#333" strokeWidth="0.5" strokeDasharray="2" />
-            <path d={areaPath} fill="url(#grad)" stroke="none" />
-            <polyline points={points} fill="none" stroke="#10b981" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </svg>
-          <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none transition-all duration-75" style={{ left: `${currentX}%` }}><div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-white rounded-full"></div></div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // Budget Component
 const BudgetPlanner = () => {
   const [budget, setBudget] = useState(() => {
@@ -580,6 +546,246 @@ const BudgetPlanner = () => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// --- NEW SUGGESTION BOX COMPONENT (LIVE) ---
+const SuggestionBox = () => {
+  const [suggestions, setSuggestions] = useState([]);
+  const [newSuggestion, setNewSuggestion] = useState({ title: '', user: '', text: '', img: '', day: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sortBy, setSortBy] = useState("votes"); // "votes" or "newest"
+  const [votedItems, setVotedItems] = useState(() => {
+    const saved = localStorage.getItem('peru-voted-suggestions');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 1. Subscribe to Live Updates
+  useEffect(() => {
+    if (!db) {
+      setLoading(false);
+      setError("Firebase not configured. Please see instructions.");
+      return;
+    }
+
+    const q = query(collection(db, "suggestions"));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liveData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setSuggestions(liveData);
+      setLoading(false);
+    }, (err) => {
+      console.error("Firebase Error:", err);
+      setError("Error connecting to database. Did you set up Firebase?");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Add Suggestion (Write to DB)
+  const addSuggestion = async () => {
+    if (!newSuggestion.title.trim() || !db) return;
+    
+    const dayValue = newSuggestion.day === "" ? "General Idea" : newSuggestion.day;
+
+    try {
+      await addDoc(collection(db, "suggestions"), {
+        ...newSuggestion,
+        day: dayValue,
+        votes: 0,
+        createdAt: new Date().toISOString()
+      });
+      // Clear all fields
+      setNewSuggestion({ title: '', user: '', text: '', img: '', day: '' });
+    } catch (e) {
+      console.error("Error adding document: ", e);
+      alert("Could not add suggestion. Check your database permissions.");
+    }
+  };
+
+  // 3. Vote (Update DB)
+  const voteSuggestion = async (id, change) => {
+    if (!db) return;
+    
+    // Check if already voted
+    if (votedItems.includes(id)) {
+        return; // Do nothing if already voted
+    }
+
+    try {
+      const ref = doc(db, "suggestions", id);
+      await updateDoc(ref, {
+        votes: increment(change)
+      });
+      
+      const newVotedItems = [...votedItems, id];
+      setVotedItems(newVotedItems);
+      localStorage.setItem('peru-voted-suggestions', JSON.stringify(newVotedItems));
+    } catch (e) {
+      console.error("Error updating vote:", e);
+    }
+  };
+
+  // 5. Sort Suggestions
+  const sortedSuggestions = useMemo(() => {
+    return [...suggestions].sort((a, b) => {
+      if (sortBy === "votes") return b.votes - a.votes;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+  }, [suggestions, sortBy]);
+
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 min-h-[600px]">
+      <h2 className="text-xl font-bold text-stone-800 mb-6 flex items-center gap-2">
+        <MessageSquare className="text-emerald-600" /> Group Suggestions
+      </h2>
+      
+      {error ? (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-start gap-3">
+          <AlertCircle size={20} className="mt-0.5" />
+          <div>
+            <p className="font-bold">Connection Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* New Suggestion Form */}
+          <div className="mb-8 bg-stone-50 p-4 rounded-xl border border-stone-100">
+            <h3 className="font-bold text-stone-600 mb-3 text-sm uppercase">Add New Idea</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <input 
+                type="text" 
+                placeholder="Title (e.g. Rainbow Mountain)" 
+                className="p-2 rounded border border-stone-200 text-sm"
+                value={newSuggestion.title}
+                onChange={(e) => setNewSuggestion({...newSuggestion, title: e.target.value})}
+              />
+              <input 
+                type="text" 
+                placeholder="Your Name" 
+                className="p-2 rounded border border-stone-200 text-sm"
+                value={newSuggestion.user}
+                onChange={(e) => setNewSuggestion({...newSuggestion, user: e.target.value})}
+              />
+              <select 
+                className="p-2 rounded border border-stone-200 text-sm bg-white"
+                value={newSuggestion.day}
+                onChange={(e) => setNewSuggestion({...newSuggestion, day: e.target.value})}
+              >
+                <option value="" disabled>Select Day</option>
+                <option value="General Idea">General Idea</option>
+                {INITIAL_ITINERARY.map(d => <option key={d.day} value={`Day ${d.day}`}>Day {d.day} ({d.location})</option>)}
+              </select>
+              <input 
+                type="text" 
+                placeholder="Image URL (Optional)" 
+                className="p-2 rounded border border-stone-200 text-sm"
+                value={newSuggestion.img}
+                onChange={(e) => setNewSuggestion({...newSuggestion, img: e.target.value})}
+              />
+            </div>
+            <textarea 
+              value={newSuggestion.text}
+              onChange={(e) => setNewSuggestion({...newSuggestion, text: e.target.value})}
+              placeholder="Describe your idea..."
+              className="w-full p-3 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-100 h-20 text-sm mb-3"
+            />
+            <button 
+              onClick={addSuggestion}
+              className="w-full bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <Plus size={16} /> Add Suggestion
+            </button>
+          </div>
+
+          {/* Controls */}
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-xs text-stone-400 uppercase font-bold">{suggestions.length} Suggestions</span>
+            <div className="flex items-center gap-2 bg-stone-100 p-1 rounded-lg">
+              <button 
+                onClick={() => setSortBy("votes")} 
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${sortBy === "votes" ? "bg-white shadow text-stone-800" : "text-stone-500 hover:text-stone-700"}`}
+              >
+                Top Voted
+              </button>
+              <button 
+                onClick={() => setSortBy("newest")} 
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${sortBy === "newest" ? "bg-white shadow text-stone-800" : "text-stone-500 hover:text-stone-700"}`}
+              >
+                Newest
+              </button>
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="space-y-4">
+            {loading && <p className="text-center text-stone-400">Loading live suggestions...</p>}
+            
+            {!loading && suggestions.length === 0 && (
+              <div className="text-center text-stone-400 py-12">
+                <MessageSquare size={48} className="mx-auto mb-2 opacity-20" />
+                <p>No suggestions yet.</p>
+              </div>
+            )}
+
+            {sortedSuggestions.map(s => (
+              <div key={s.id} className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex flex-col md:flex-row">
+                  {/* Image (if exists) */}
+                  {s.img && (
+                    <div className="w-full md:w-32 h-32 md:h-auto bg-stone-200 flex-shrink-0 relative">
+                      <img src={s.img} alt={s.title} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  
+                  <div className="p-4 flex-grow flex gap-4">
+                    {/* Votes */}
+                    <div className="flex flex-col items-center justify-center gap-1 bg-stone-50 p-2 rounded-lg h-fit border border-stone-100">
+                      <button 
+                        onClick={() => voteSuggestion(s.id, 1)} 
+                        disabled={votedItems.includes(s.id)}
+                        className={`p-1.5 rounded-lg transition-colors ${votedItems.includes(s.id) ? "text-stone-300 cursor-not-allowed" : "hover:bg-stone-200 text-stone-400 hover:text-emerald-500"}`}
+                      >
+                        <ThumbsUp size={16} />
+                      </button>
+                      <span className="font-bold text-stone-700 text-sm">{s.votes || 0}</span>
+                      <button 
+                        onClick={() => voteSuggestion(s.id, -1)} 
+                        disabled={votedItems.includes(s.id)}
+                        className={`p-1.5 rounded-lg transition-colors ${votedItems.includes(s.id) ? "text-stone-300 cursor-not-allowed" : "hover:bg-stone-200 text-stone-400 hover:text-red-500"}`}
+                      >
+                        <ThumbsDown size={16} />
+                      </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-grow">
+                      <div className="flex justify-between items-start mb-1">
+                        <h3 className="font-bold text-stone-800">{s.title}</h3>
+                        <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 whitespace-nowrap">{s.day}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2 text-xs text-stone-500">
+                        <User size={12} /> {s.user || 'Anonymous'}
+                      </div>
+                      <p className="text-stone-600 text-sm leading-relaxed mb-3">{s.text}</p>
+                      <div className="flex justify-between items-center text-[10px] text-stone-400 border-t border-stone-100 pt-2">
+                        <span className="flex items-center gap-1"><Cloud size={10} /> {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'Just now'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -680,6 +886,7 @@ export default function App() {
             {[
               { id: 'itinerary', icon: LayoutDashboard, label: 'Itinerary' }, 
               { id: 'budget', icon: Wallet, label: 'Team Budget' }, 
+              { id: 'suggestions', icon: MessageSquare, label: 'Suggestions' }
             ].map(item => (
               <button key={item.id} onClick={() => setView(item.id)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all whitespace-nowrap ${view === item.id ? "bg-emerald-900 text-white shadow-lg" : "hover:bg-stone-800 hover:text-stone-200"}`}><item.icon size={18} /><span className="font-medium">{item.label}</span></button>
             ))}
@@ -865,6 +1072,7 @@ export default function App() {
           )}
 
           {view === 'budget' && <BudgetPlanner />}
+          {view === 'suggestions' && <SuggestionBox />}
         </div>
       </main>
 
