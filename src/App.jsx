@@ -24,6 +24,7 @@ const firebaseConfig = {
   measurementId: "G-QB7X333KZF"
 };
 
+
 // Initialize Firebase
 let db;
 try {
@@ -582,6 +583,9 @@ const BudgetPlanner = () => {
       }));
       setItems(liveItems);
       setLoading(false);
+    }, (err) => {
+      console.error("Firebase Error:", err);
+      setLoading(false);
     });
 
     // Listener for Total Budget
@@ -590,6 +594,8 @@ const BudgetPlanner = () => {
       if (doc.exists()) {
         setBudget(doc.data().total);
       }
+    }, (err) => {
+      console.error("Firebase Error (Budget):", err);
     });
 
     return () => {
@@ -744,16 +750,16 @@ const CommentSection = ({ suggestionId }) => {
             ))}
           </div>
 
-          {/* Add Form */}
-          <div className="flex gap-2">
+          {/* Add Form (Mobile Optimized: flex-col on small screens, row on md+) */}
+          <div className="flex flex-col md:flex-row gap-2">
             <input 
-              className="w-1/3 p-2 text-xs border border-stone-200 rounded" 
+              className="w-full md:w-1/3 p-3 md:p-2 text-sm md:text-xs border border-stone-200 rounded" 
               placeholder="Name" 
               value={newAuthor}
               onChange={e => setNewAuthor(e.target.value)}
             />
             <input 
-              className="flex-grow p-2 text-xs border border-stone-200 rounded" 
+              className="flex-grow p-3 md:p-2 text-sm md:text-xs border border-stone-200 rounded" 
               placeholder="Add a comment..." 
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
@@ -761,7 +767,7 @@ const CommentSection = ({ suggestionId }) => {
             />
             <button 
               onClick={handlePostComment}
-              className="bg-stone-200 hover:bg-stone-300 text-stone-600 p-2 rounded"
+              className="bg-stone-200 hover:bg-stone-300 text-stone-600 p-3 md:p-2 rounded w-full md:w-auto flex items-center justify-center"
             >
               <ArrowRight size={14} />
             </button>
