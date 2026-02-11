@@ -5,7 +5,7 @@ import {
   Map as MapIcon, Wallet, Notebook, CheckSquare, AlertCircle,
   ExternalLink, Navigation, Calculator as CalcIcon, Grid, List, 
   Upload, Share2, Tent, Landmark, Palmtree, ArrowRight, ArrowDown, ArrowLeft,
-  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen, MessageSquare, ThumbsUp, Cloud, ThumbsDown, Filter, User
+  Ship, Clock, Footprints, Ticket, Image as ImageIcon, NotebookPen, MessageSquare, ThumbsUp, Cloud, ThumbsDown, Filter, User, MessageCircle
 } from 'lucide-react';
 
 // Import Firebase (Make sure you ran: npm install firebase)
@@ -682,6 +682,96 @@ const BudgetPlanner = () => {
   );
 };
 
+// --- COMMENT COMPONENT ---
+const CommentSection = ({ suggestionId }) => {
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [newAuthor, setNewAuthor] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!db || !expanded) return;
+
+    // Sub-collection reference: suggestions/{id}/comments
+    const commentsRef = collection(db, "suggestions", suggestionId, "comments");
+    const q = query(commentsRef, orderBy("createdAt", "asc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const c = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setComments(c);
+    });
+
+    return () => unsubscribe();
+  }, [suggestionId, expanded]);
+
+  const handlePostComment = async () => {
+    if (!newComment.trim() || !newAuthor.trim()) return;
+    
+    try {
+      const commentsRef = collection(db, "suggestions", suggestionId, "comments");
+      await addDoc(commentsRef, {
+        text: newComment,
+        author: newAuthor,
+        createdAt: new Date().toISOString()
+      });
+      setNewComment("");
+      // Keep author name for convenience
+    } catch (e) {
+      console.error("Error posting comment", e);
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t border-stone-100 pt-2">
+      <button 
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 text-xs text-stone-500 hover:text-emerald-600 transition-colors mb-2"
+      >
+        <MessageCircle size={14} />
+        {expanded ? "Hide Comments" : `Show Comments`}
+      </button>
+
+      {expanded && (
+        <div className="bg-stone-50 rounded-lg p-3 animate-in fade-in slide-in-from-top-1">
+          {/* List */}
+          <div className="space-y-3 mb-3 max-h-40 overflow-y-auto">
+            {comments.length === 0 && <p className="text-xs text-stone-400 italic">No comments yet.</p>}
+            {comments.map(c => (
+              <div key={c.id} className="text-sm">
+                <span className="font-bold text-stone-700 text-xs">{c.author}: </span>
+                <span className="text-stone-600">{c.text}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Add Form */}
+          <div className="flex gap-2">
+            <input 
+              className="w-1/3 p-2 text-xs border border-stone-200 rounded" 
+              placeholder="Name" 
+              value={newAuthor}
+              onChange={e => setNewAuthor(e.target.value)}
+            />
+            <input 
+              className="flex-grow p-2 text-xs border border-stone-200 rounded" 
+              placeholder="Add a comment..." 
+              value={newComment}
+              onChange={e => setNewComment(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+            />
+            <button 
+              onClick={handlePostComment}
+              className="bg-stone-200 hover:bg-stone-300 text-stone-600 p-2 rounded"
+            >
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- NEW SUGGESTION BOX COMPONENT (LIVE) ---
 const SuggestionBox = () => {
   const [suggestions, setSuggestions] = useState([]);
@@ -915,7 +1005,7 @@ const SuggestionBox = () => {
                   
                   <div className="p-4 flex-grow flex gap-4">
                     {/* Votes */}
-                    <div className="flex flex-col items-center justify-center gap-1 bg-stone-50 p-2 rounded-lg h-fit border border-stone-100">
+                    <div className="flex flex-col items-center justify-start gap-1 bg-stone-50 p-2 rounded-lg h-fit border border-stone-100 min-w-[50px]">
                       <button 
                         onClick={() => handleVote(s.id, 'up')} 
                         className={`p-1.5 rounded-lg transition-colors ${userVote === 'up' ? "bg-emerald-100 text-emerald-600" : "hover:bg-stone-200 text-stone-400 hover:text-emerald-500"}`}
@@ -941,9 +1031,13 @@ const SuggestionBox = () => {
                         <User size={12} /> {s.user || 'Anonymous'}
                       </div>
                       <p className="text-stone-600 text-sm leading-relaxed mb-3">{s.text}</p>
-                      <div className="flex justify-between items-center text-[10px] text-stone-400 border-t border-stone-100 pt-2">
+                      
+                      <div className="flex justify-between items-center text-[10px] text-stone-400 border-t border-stone-100 pt-2 mt-auto">
                         <span className="flex items-center gap-1"><Cloud size={10} /> {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'Just now'}</span>
                       </div>
+                      
+                      {/* Comments Section */}
+                      <CommentSection suggestionId={s.id} />
                     </div>
                   </div>
                 </div>
