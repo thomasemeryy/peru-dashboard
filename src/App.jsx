@@ -99,7 +99,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Local Guesthouse (2-4 people/room)",
     notes: "Meet community and get an explanation of how the project works.",
     coords: { x: 70, y: 69 },
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Peru_-_54528594972.jpg/760px-Mapcarta.jpg"
+    img: "https://www.sapiens.org/app/uploads/2021/07/01_finished-hanging-bridge.jpg"
   },
   {
     day: 6,
@@ -112,7 +112,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Local Guesthouse",
     notes: "",
     coords: { x: 70, y: 69 },
-    img: "https://lh3.googleusercontent.com/gps-cs-s/AHVAweonJY6LJ6grXyiCoUg6dHVyZDi5orv3A2i47w867b08p4NVlnBEiMCLTa2z4CbRUO7sMi3YcAZOFojfLb5LP7B2jBoCLMXF4-5XQT1elDh_14A3sZEFDOJS4ngty1QIV9FH5bE8SQ=w1080-h624-n-k-no"
+    img: "https://upload.wikimedia.org/wikipedia/commons/2/2a/Sihuas01.jpg"
   },
   {
     day: 7,
@@ -138,7 +138,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Local Guesthouse",
     notes: "",
     coords: { x: 68, y: 72 },
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/CALCA.jpg/760px-Mapcarta.jpg"
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Peru_-_54528594972.jpg/3840px-Peru_-_54528594972.jpg"
   },
   {
     day: 9,
@@ -247,7 +247,7 @@ const INITIAL_ITINERARY = [
     accommodation: "Overnight: Hotel?",
     notes: "There may be time to visit the hot springs, which the budget could be spent on. Dinner plans need to be decided as a team.",
     coords: { x: 61.5, y: 67 },
-    img: "https://www.machupicchureservations.org/wp-content/themes/machupicchureservations-child/images/placeholder_mobile.jpg"
+    img: "https://cdn.mos.cms.futurecdn.net/WFJBpzs4J5x3uvbeKdnm3i.jpg"
   },
   {
     day: 17,
